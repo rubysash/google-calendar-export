@@ -3,7 +3,7 @@
 A Python script to extract Google Calendar events from the last 45 days (or custom period) and export them to an Excel spreadsheet with emails, phone numbers, and all event details.
 
 
-![Hex Explorer Demo](https://github.com/rubysash/google-calendar-export/blob/main/demo/demo.png?raw=true)
+![Demo](https://github.com/rubysash/google-calendar-export/blob/main/demo.png?raw=true)
 
 ## Table of Contents
 - [Prerequisites](#prerequisites)
