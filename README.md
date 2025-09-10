@@ -355,7 +355,4 @@ If you encounter issues not covered in troubleshooting:
 1. Verify all steps were followed exactly
 2. Check that your Google account has calendar events in the specified time period
 3. Ensure you have a stable internet connection
-4. Try running with administrator privileges:
-   - Right-click Command Prompt
-   - Select "Run as administrator"
-   - Navigate to your project folder and run the script
+
