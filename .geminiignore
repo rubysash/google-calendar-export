@@ -1,0 +1,18 @@
+# Virtual Environments
+Include/
+Lib/
+Scripts/
+google-calendar-export/
+venv/
+.venv/
+env/
+
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Data/Tokens
+token.pickle
+calendar_export.xlsx
+365.xlsx
