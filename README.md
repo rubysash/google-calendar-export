@@ -9,8 +9,10 @@ A Python-based utility to extract Google Calendar events and export them to a fo
 *   **Technology Stack:** Python 3.12+, Google Calendar API v3, `pandas`, `openpyxl`.
 *   **Key Features:**
     *   Extracts event details, attendees, meeting links, and metadata.
-    *   Uses regex to pull email addresses and phone numbers from event descriptions/locations.
-    *   Outputs a styled Excel file with auto-adjusted column widths and filters.
+    *   **Description Cleaning:** Automatically removes extracted emails and phone numbers from descriptions for a cleaner spreadsheet.
+    *   **Data Squashing:** Converts multi-line descriptions into a single line while preserving spaces.
+    *   **Smart Deduplication:** Uses regex to pull email addresses and phone numbers, deduplicating them based on content.
+    *   Outputs a styled Excel file with auto-adjusted column widths and filters (uses comma separators for multiple values).
 
 ---
 

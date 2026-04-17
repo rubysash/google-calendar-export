@@ -120,14 +120,16 @@ def extract_phone_numbers(text):
         matches = re.findall(pattern, text)
         phone_numbers.extend(matches)
     
-    # Clean and deduplicate
-    cleaned_numbers = []
+    # Clean and deduplicate by comparing numeric content
+    final_numbers = []
+    seen_digits = set()
     for num in phone_numbers:
-        cleaned = re.sub(r'[^\d+]', '', num)
-        if len(cleaned) >= 10 and cleaned not in cleaned_numbers:
-            cleaned_numbers.append(num)
+        digits = re.sub(r'[^\d+]', '', num)
+        if len(digits) >= 10 and digits not in seen_digits:
+            final_numbers.append(num)
+            seen_digits.add(digits)
     
-    return cleaned_numbers
+    return final_numbers
 
 def get_calendar_events(service, days_back=45):
     """Fetch calendar events from the last N days"""
@@ -168,28 +170,48 @@ def parse_event_data(events):
     """Parse event data into structured format"""
     parsed_events = []
     
+    def squash_text(text):
+        if not text: return ''
+        # Replace newlines/tabs with spaces and collapse multiple spaces
+        text = text.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ')
+        return ' '.join(text.split())
+    
     for event in events:
-        # Combine all text fields for email/phone extraction
-        combined_text = ' '.join(filter(None, [
-            event.get('summary', ''),
-            event.get('description', ''),
-            event.get('location', ''),
-        ]))
+        # Get and squash text fields
+        orig_summary = event.get('summary', '')
+        orig_description = event.get('description', '')
+        orig_location = event.get('location', '')
         
+        summary = squash_text(orig_summary)
+        description = squash_text(orig_description)
+        location = squash_text(orig_location)
+        
+        # Combine all squashed text for extraction
+        combined_text = ' '.join(filter(None, [summary, description, location]))
+        
+        # Extract emails and phone numbers from the text
+        text_emails = extract_emails(combined_text)
+        phone_numbers = extract_phone_numbers(combined_text)
+        
+        # Clean description by removing found emails and phones
+        cleaned_description = description
+        if cleaned_description:
+            # Sort by length descending to avoid partial replacements (e.g., short phone inside long)
+            for email in sorted(list(set(text_emails)), key=len, reverse=True):
+                cleaned_description = cleaned_description.replace(email, '')
+            for phone in sorted(list(set(phone_numbers)), key=len, reverse=True):
+                cleaned_description = cleaned_description.replace(phone, '')
+            # Reclean spaces after removals
+            cleaned_description = squash_text(cleaned_description)
+            
         # Extract attendees' emails
         attendees_list = event.get('attendees', [])
         attendee_emails = [att.get('email', '') for att in attendees_list]
         attendee_names = [att.get('displayName', '') for att in attendees_list]
         attendee_statuses = [att.get('responseStatus', '') for att in attendees_list]
         
-        # Extract emails from text fields
-        text_emails = extract_emails(combined_text)
-        
-        # Combine all emails
-        all_emails = list(set(attendee_emails + text_emails))
-        
-        # Extract phone numbers
-        phone_numbers = extract_phone_numbers(combined_text)
+        # Combine all emails (attendees + extracted from text)
+        all_emails = sorted(list(set(attendee_emails + text_emails)))
         
         # Get start and end times
         start = event.get('start', {})
@@ -226,9 +248,9 @@ def parse_event_data(events):
         
         parsed_event = {
             'event_id': event.get('id', ''),
-            'summary': event.get('summary', ''),
-            'description': event.get('description', ''),
-            'location': event.get('location', ''),
+            'summary': summary,
+            'description': cleaned_description,
+            'location': location,
             'start_date': start_dt.date() if start_dt else None,
             'start_time': start_dt.time() if start_dt and not all_day else None,
             'end_date': end_dt.date() if end_dt else None,
@@ -241,21 +263,21 @@ def parse_event_data(events):
             'organizer_name': event.get('organizer', {}).get('displayName', ''),
             'creator_email': event.get('creator', {}).get('email', ''),
             'creator_name': event.get('creator', {}).get('displayName', ''),
-            'attendee_emails': '; '.join(attendee_emails),
-            'attendee_names': '; '.join(attendee_names),
-            'attendee_statuses': '; '.join(attendee_statuses),
+            'attendee_emails': ', '.join(attendee_emails),
+            'attendee_names': ', '.join(attendee_names),
+            'attendee_statuses': ', '.join(attendee_statuses),
             'attendee_count': len(attendees_list),
-            'all_extracted_emails': '; '.join(all_emails),
-            'extracted_phone_numbers': '; '.join(phone_numbers),
+            'all_extracted_emails': ', '.join(all_emails),
+            'extracted_phone_numbers': ', '.join(phone_numbers),
             'recurring_event_id': event.get('recurringEventId', ''),
             'is_recurring': 'recurringEventId' in event,
             'html_link': event.get('htmlLink', ''),
             'conference_type': conference_solution,
-            'meeting_links': '; '.join(meeting_links),
+            'meeting_links': ', '.join(meeting_links),
             'created': event.get('created', ''),
             'updated': event.get('updated', ''),
             'reminders': str(event.get('reminders', {})),
-            'attachments': '; '.join([att.get('title', '') for att in event.get('attachments', [])]),
+            'attachments': ', '.join([att.get('title', '') for att in event.get('attachments', [])]),
             'color_id': event.get('colorId', ''),
             'transparency': event.get('transparency', 'opaque'),
         }
@@ -385,9 +407,9 @@ def main():
     all_phones = set()
     for event in parsed_events:
         if event['all_extracted_emails']:
-            all_emails.update(event['all_extracted_emails'].split('; '))
+            all_emails.update([e.strip() for e in event['all_extracted_emails'].split(',')])
         if event['extracted_phone_numbers']:
-            all_phones.update(event['extracted_phone_numbers'].split('; '))
+            all_phones.update([p.strip() for p in event['extracted_phone_numbers'].split(',')])
     
     print(f"\n{Fore.BLUE}Summary:{Style.RESET_ALL}")
     print(f"  Total events: {len(parsed_events)}")
