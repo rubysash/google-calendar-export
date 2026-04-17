@@ -170,40 +170,24 @@ def parse_event_data(events):
     """Parse event data into structured format"""
     parsed_events = []
     
-    def squash_text(text):
+    def clean_text(text):
         if not text: return ''
-        # Replace newlines/tabs with spaces and collapse multiple spaces
-        text = text.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ')
-        return ' '.join(text.split())
+        # Ensure we don't have carriage returns messing with Excel, but keep newlines
+        return text.replace('\r\n', '\n').replace('\r', '\n')
     
     for event in events:
-        # Get and squash text fields
-        orig_summary = event.get('summary', '')
-        orig_description = event.get('description', '')
-        orig_location = event.get('location', '')
+        # Get text fields
+        summary = clean_text(event.get('summary', ''))
+        description = clean_text(event.get('description', ''))
+        location = clean_text(event.get('location', ''))
         
-        summary = squash_text(orig_summary)
-        description = squash_text(orig_description)
-        location = squash_text(orig_location)
-        
-        # Combine all squashed text for extraction
+        # Combine text for extraction (use space to avoid joining words at boundaries)
         combined_text = ' '.join(filter(None, [summary, description, location]))
         
         # Extract emails and phone numbers from the text
         text_emails = extract_emails(combined_text)
         phone_numbers = extract_phone_numbers(combined_text)
         
-        # Clean description by removing found emails and phones
-        cleaned_description = description
-        if cleaned_description:
-            # Sort by length descending to avoid partial replacements (e.g., short phone inside long)
-            for email in sorted(list(set(text_emails)), key=len, reverse=True):
-                cleaned_description = cleaned_description.replace(email, '')
-            for phone in sorted(list(set(phone_numbers)), key=len, reverse=True):
-                cleaned_description = cleaned_description.replace(phone, '')
-            # Reclean spaces after removals
-            cleaned_description = squash_text(cleaned_description)
-            
         # Extract attendees' emails
         attendees_list = event.get('attendees', [])
         attendee_emails = [att.get('email', '') for att in attendees_list]
@@ -249,7 +233,7 @@ def parse_event_data(events):
         parsed_event = {
             'event_id': event.get('id', ''),
             'summary': summary,
-            'description': cleaned_description,
+            'description': description,
             'location': location,
             'start_date': start_dt.date() if start_dt else None,
             'start_time': start_dt.time() if start_dt and not all_day else None,
